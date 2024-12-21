@@ -1,0 +1,35 @@
+---
+dev:
+  ids: ws2811_led_strip_50
+  name: WS2811 LED Strip
+  mf: LED Strip Manufacturer
+  mdl: WS2811
+  sw: '1.0'
+  sn: ws2811_sn_0001
+  hw: rev1
+o:
+  name: led_controller
+  sw: '3.0'
+  url: https://ledsupport.example.com
+cmps:
+  all_leds:
+    p: light
+    clrm: "rgb"
+    ret: true
+    unique_id: ws2811_all_leds
+    rgb_stat_t: "stat/MQTT_UID/all_leds/rgb"
+    rgb_cmd_t: "cmnd/MQTT_UID/all_leds/rgb"
+    name: "All Leds"
+    command_topic: "cmnd/MQTT_UID/all_leds"
+    state_topic: "stat/MQTT_UID/all_leds"
+  blink_leds:
+    p: switch
+    ret: true
+    ent_cat: EntityCategory.CONFIG
+    unique_id: ws2811_all_leds_blink
+    name: "All Leds"
+    icon: "mdi:lightning-bolt-circle"
+    command_topic: "cmnd/MQTT_UID/all_leds/blink"
+    state_topic: "stat/MQTT_UID/all_leds/blink"
+state_topic: ws2811_led_strip/state
+qos: 1
