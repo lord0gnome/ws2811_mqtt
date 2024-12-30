@@ -4,8 +4,9 @@ import paho.mqtt.client as mqtt
 import yaml
 import pprint
 import logging
+
 from ws2811_mqtt.logger import log_client
-from ws2811_mqtt.leds import leds, set_led, NUM_LEDS
+from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_alternating_colors, stop_alternating_colors
 from ws2811_mqtt.utils import colr_str_to_tuple, colr_tuple_to_st
 
 
@@ -13,10 +14,10 @@ mqtt_client = None
 device_config = None  # Declare a global variable for the device configuration
 
 # MQTT settings
-MQTT_BROKER = os.getenv("MQTT_BROKER") or "CHANGE_THIS_TO_MQTTBROKER"
-MQTT_PORT = int(os.getenv("MQTT_PORT")) or 12345
-MQTT_USER = os.getenv("MQTT_USER") or "CHANGE_THIS_TO_MQTTUSER"
-MQTT_PASS = os.getenv("MQTT_PASS") or "CHANGE_THIS_TO_MQTTPASSWORD"
+MQTT_BROKER = os.getenv("MQTT_BROKER") or raise ValueError("Missing MQTT_BROKEN env var")
+MQTT_PORT = int(os.getenv("MQTT_PORT")) or raise ValueError("Missing MQTT_BROKEN env var"
+MQTT_USER = os.getenv("MQTT_USER") or raise ValueError("Missing MQTT_BROKEN env var"
+MQTT_PASS = os.getenv("MQTT_PASS") or raise ValueError("Missing MQTT_BROKEN env var"
 MQTT_UID = os.getenv("MQTT_UID") or "ws2811-mqtt"
 MQTT_TOPIC_STATUS = os.getenv("MQTT_TOPIC_STATUS") or f"homeassistant/device/{MQTT_UID}/config"
 
@@ -53,6 +54,8 @@ def publish_led(led_index):
 def on_connect(client, userdata, flags, rc):
     log_client.info(f"[MQTT][%15s] Connected to broker", "on_connect")
     # Loop through LEDs and subscribe to their command topics
+    client.subscribe(f"cmnd/{MQTT_UID}/all_leds/alternate")
+    client.subscribe(f"cmnd/{MQTT_UID}/all_leds/stop")
     for _, led_config in device_config['cmps'].items():
         for topic_type in ["command_topic", "rgb_cmd_t"]:
             topic = led_config.get(topic_type, False)
@@ -72,9 +75,14 @@ def on_message(client, userdata, msg):
         payload = msg.payload.decode('utf-8')
         log_client.info(f"[MQTT][%15s] topic  : \"{msg.topic}\"", "on_message")
         log_client.info(f"[MQTT][%15s] payload: \"{msg.payload}\"", "on_message")
-        if msg.topic == f"cmnd/{MQTT_UID}/all_leds/blink":
-            publish_state(f"stat/{MQTT_UID}/all_leds/blink")
-        if msg.topic == f"cmnd/{MQTT_UID}/all_leds/rgb":
+        if msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate":
+            options = json.loads(payload)
+            color_one = colr_str_to_tuple(options.get("color_one"))
+            color_two = colr_str_to_tuple(options.get("color_two"))
+            rate = options.get("rate", 1)
+            transition = options.get("transition", False)
+            start_alternating_colors(color_one, color_two, rate, transition)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/rgb":
             for led_index in range(len(leds)):
                 leds[led_index] = {"state": "ON", "color": colr_str_to_tuple(payload) }
                 set_led(led_index)
@@ -94,7 +102,7 @@ def on_message(client, userdata, msg):
             led_index = int(msg.topic.split(MQTT_UID)[-1].split('/')[1].split('_')[-1]) -1
             leds[led_index] = {"state": "ON", "color": colr_str_to_tuple(payload) }
             set_led(led_index)
-        publish_led(led_index)
+        # publish_led(led_index)
     except Exception as e:
         log_client.error(f"[MQTT][%15s] Error processing message: {e}", "on_message")
         log_client.debug(f"[MQTT][%15s] Message payload : {msg.payload}", "on_message")

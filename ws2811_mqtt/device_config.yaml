@@ -22,14 +22,20 @@ cmps:
     name: "All Leds"
     command_topic: "cmnd/MQTT_UID/all_leds"
     state_topic: "stat/MQTT_UID/all_leds"
-  blink_leds:
+  alternate_color:
     p: switch
     ret: true
-    ent_cat: EntityCategory.CONFIG
-    unique_id: ws2811_all_leds_blink
-    name: "All Leds"
-    icon: "mdi:lightning-bolt-circle"
-    command_topic: "cmnd/MQTT_UID/all_leds/blink"
-    state_topic: "stat/MQTT_UID/all_leds/blink"
+    unique_id: ws2811_all_leds_alternate
+    name: "Alternate Colors"
+    command_topic: "cmnd/MQTT_UID/all_leds/alternate"
+  mode:
+    p: select
+    ops:
+      - Alternate Two Colors
+      - Static Colors
+    ret: true
+    unique_id: ws2811_mode
+    name: "Light Mode"
+    command_topic: "cmnd/MQTT_UID/all_leds/stop"
 state_topic: ws2811_led_strip/state
 qos: 1
