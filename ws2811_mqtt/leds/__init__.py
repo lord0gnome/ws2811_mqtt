@@ -16,30 +16,53 @@ leds = [{"state": "OFF", "color": (255,255,255)} for _ in range(len(pixels))]
 
 alternating_thread = None
 alternating_colors_active = False
+last_state = -1
 
-def manage_alternating_colors(color_one, color_two, rate, transition):
+alternating_colors_options = {
+    "color_one": (255,255,0),
+    "color_two": (0,255,255),
+    "rate": 2,
+    "transition": True,
+}
+
+def set_ac_option(key, value):
+    global alternating_colors_options
     global alternating_colors_active
+
+    log_client.info(f"[LEDS][%15s] set_ac_option called with key={key}, value={value}", "set_ac_option")
+    alternating_colors_options[key] = value
+    if alternating_colors_active:
+        stop_alternating_colors()
+        start_alternating_colors()
+
+
+def manage_alternating_colors():
+    global alternating_colors_active
+    global alternating_colors_options
+    global last_state
     try:
-        state = -1
+        state = -last_state
         while alternating_colors_active:
             state = -state
             for i in range(NUM_LEDS):
-                set_l_on(i, color_one if state == 1 else color_two)
-                if transition:
-                    time.sleep(rate / NUM_LEDS)
+                set_l_on(i, alternating_colors_options.get("color_one") if state == 1 else alternating_colors_options.get("color_two"))
+                if alternating_colors_options.get("transition"):
+                    time.sleep(alternating_colors_options.get("rate") / NUM_LEDS)
+                if not alternating_colors_active:
+                    break
             log_client.info(f"[LEDS][%15s] state => {state}", "manage_alternating_colors")
-            if not transition:
-                time.sleep(rate)
+            if not alternating_colors_options.get("transition"):
+                time.sleep(alternating_colors_options.get("rate"))
     except Exception as e:
         log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_alternating_colors")
 
-def start_alternating_colors(color_one, color_two, rate, transition):
-    global alternating_thread, alternating_colors_active
+def start_alternating_colors():
+    global alternating_thread, alternating_colors_active, alternating_colors_options
     if alternating_thread is not None and alternating_thread.is_alive():
         stop_alternating_colors()
         alternating_thread.join()  # Ensure the previous thread ends before starting a new one
     alternating_colors_active = True
-    alternating_thread = threading.Thread(target=manage_alternating_colors, args=(color_one, color_two, rate, transition))
+    alternating_thread = threading.Thread(target=manage_alternating_colors, args=())
     alternating_thread.start()
 
 def stop_alternating_colors():
@@ -55,7 +78,7 @@ def set_led(led_index):
             pixels[led_index] = (0, 0, 0)
         else:
             pixels[led_index] = leds[led_index]["color"]
-            log_client.info(f"[LEDS][%15s] {led_index} => {leds[led_index]['state']}", "set_led")
+            log_client.debug(f"[LEDS][%15s] {led_index} => {leds[led_index]['state']}", "set_led")
     except Exception as e:
         log_client.error(f"[LEDS][%15s] Error applying LED changest to led {led_index}: {e}", "set_led")
 
@@ -82,6 +105,6 @@ def set_l_on(led_index, color=None):
     try:
         leds[led_index].update({"state": "ON", "color": color or leds[led_index]["color"]})
         set_led(led_index)
-        log_client.info(f"[LEDS][%15s] LED {led_index} color set to {color}.", "set_l_on")
+        log_client.debug(f"[LEDS][%15s] LED {led_index} color set to {color}.", "set_l_on")
     except Exception as e:
         log_client.error(f"[LEDS][%15s] Error setting LED color: {e}", "set_l_on")

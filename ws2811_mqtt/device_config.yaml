@@ -27,15 +27,45 @@ cmps:
     ret: true
     unique_id: ws2811_all_leds_alternate
     name: "Alternate Colors"
+    state_topic: "stat/MQTT_UID/all_leds/alternate"
     command_topic: "cmnd/MQTT_UID/all_leds/alternate"
-  mode:
-    p: select
-    ops:
-      - Alternate Two Colors
-      - Static Colors
+  alternate_color_color_one:
+    p: light
+    clrm: "rgb"
     ret: true
-    unique_id: ws2811_mode
-    name: "Light Mode"
-    command_topic: "cmnd/MQTT_UID/all_leds/stop"
+    unique_id: ws2811_all_leds_alternate_color_one
+    name: "Alternate Color One"
+    rgb_stat_t: "stat/MQTT_UID/all_leds/alternate/color_one/rgb"
+    rgb_cmd_t: "cmnd/MQTT_UID/all_leds/alternate/color_one/rgb"
+    command_topic: "cmnd/MQTT_UID/all_leds/alternate/color_one"
+    state_topic: "stat/MQTT_UID/all_leds/alternate/color_one"
+  alternate_color_color_two:
+    p: light
+    clrm: "rgb"
+    ret: true
+    unique_id: ws2811_all_leds_alternate_color_two
+    name: "Alternate Color Two"
+    rgb_stat_t: "stat/MQTT_UID/all_leds/alternate/color_two/rgb"
+    rgb_cmd_t: "cmnd/MQTT_UID/all_leds/alternate/color_two/rgb"
+    command_topic: "cmnd/MQTT_UID/all_leds/alternate/color_two"
+    state_topic: "stat/MQTT_UID/all_leds/alternate/color_two"
+  alternate_color_rate:
+    p: number
+    mode: slider
+    min: 0.1
+    max: 16
+    icon: mdi:speed
+    ret: true
+    unique_id: ws2811_all_leds_alternate_rate
+    name: "Alternating rate"
+    command_topic: "cmnd/MQTT_UID/all_leds/alternate/rate"
+    state_topic: "stat/MQTT_UID/all_leds/alternate/rate"
+  alternate_color_transition:
+    p: switch
+    ret: true
+    unique_id: ws2811_all_leds_alternate_transition
+    name: "Alternate Transition"
+    state_topic: "stat/MQTT_UID/all_leds/alternate/transition"
+    command_topic: "cmnd/MQTT_UID/all_leds/alternate/transition"
 state_topic: ws2811_led_strip/state
 qos: 1

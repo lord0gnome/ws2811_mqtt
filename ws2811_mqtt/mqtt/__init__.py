@@ -6,18 +6,32 @@ import pprint
 import logging
 
 from ws2811_mqtt.logger import log_client
-from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_alternating_colors, stop_alternating_colors
+from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_alternating_colors, stop_alternating_colors, set_ac_option
 from ws2811_mqtt.utils import colr_str_to_tuple, colr_tuple_to_st
+
 
 
 mqtt_client = None
 device_config = None  # Declare a global variable for the device configuration
 
 # MQTT settings
-MQTT_BROKER = os.getenv("MQTT_BROKER") or raise ValueError("Missing MQTT_BROKER env var")
-MQTT_PORT = int(os.getenv("MQTT_PORT")) or raise ValueError("Missing MQTT_PORT env var"
-MQTT_USER = os.getenv("MQTT_USER") or raise ValueError("Missing MQTT_USER env var"
-MQTT_PASS = os.getenv("MQTT_PASS") or raise ValueError("Missing MQTT_PASS env var"
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+if not MQTT_BROKER:
+    raise ValueError("Missing MQTT_BROKER env var")
+MQTT_PORT = os.getenv("MQTT_PORT")
+if not MQTT_PORT:
+    raise ValueError("Missing MQTT_PORT env var")
+try:
+    MQTT_PORT = int(MQTT_PORT)
+except ValueError:
+    raise ValueError("MQTT_PORT must be an integer")
+MQTT_USER = os.getenv("MQTT_USER")
+if not MQTT_USER:
+    raise ValueError("Missing MQTT_USER env var")
+MQTT_PASS = os.getenv("MQTT_PASS")
+if not MQTT_PASS:
+    raise ValueError("Missing MQTT_PASS env var")
+
 MQTT_UID = os.getenv("MQTT_UID") or "ws2811-mqtt"
 MQTT_TOPIC_STATUS = os.getenv("MQTT_TOPIC_STATUS") or f"homeassistant/device/{MQTT_UID}/config"
 
@@ -54,8 +68,6 @@ def publish_led(led_index):
 def on_connect(client, userdata, flags, rc):
     log_client.info(f"[MQTT][%15s] Connected to broker", "on_connect")
     # Loop through LEDs and subscribe to their command topics
-    client.subscribe(f"cmnd/{MQTT_UID}/all_leds/alternate")
-    client.subscribe(f"cmnd/{MQTT_UID}/all_leds/stop")
     for _, led_config in device_config['cmps'].items():
         for topic_type in ["command_topic", "rgb_cmd_t"]:
             topic = led_config.get(topic_type, False)
@@ -76,24 +88,49 @@ def on_message(client, userdata, msg):
         log_client.info(f"[MQTT][%15s] topic  : \"{msg.topic}\"", "on_message")
         log_client.info(f"[MQTT][%15s] payload: \"{msg.payload}\"", "on_message")
         if msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate":
-            options = json.loads(payload)
-            color_one = colr_str_to_tuple(options.get("color_one"))
-            color_two = colr_str_to_tuple(options.get("color_two"))
-            rate = options.get("rate", 1)
-            transition = options.get("transition", False)
-            start_alternating_colors(color_one, color_two, rate, transition)
+            if payload == "ON":
+                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds", "OFF".encode('utf-8'), retain=True)
+                start_alternating_colors()
+            else:
+                stop_alternating_colors()
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", payload, retain=True)
+        
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_one/rgb":
+            color_one = colr_str_to_tuple(payload)
+            set_ac_option("color_one", color_one)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_one/rgb", payload.encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_one":
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_one", "ON".encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_two/rgb":
+            color_two = colr_str_to_tuple(payload)
+            set_ac_option("color_two", color_two)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_two/rgb", payload.encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_two":
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_two", "ON".encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/rate":
+            rate = payload
+            set_ac_option("rate", float(rate))
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/rate", payload, retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/transition":
+            transition = True if payload == "ON" else False
+            set_ac_option("transition", transition)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/transition", payload, retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/rgb":
+            stop_alternating_colors()
             for led_index in range(len(leds)):
                 leds[led_index] = {"state": "ON", "color": colr_str_to_tuple(payload) }
                 set_led(led_index)
-                publish_led(led_index)
+                # publish_led(led_index)
                 publish_all_led({"state": "ON", "color": colr_str_to_tuple(payload) })
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds":
+            stop_alternating_colors()
             for led_index in range(len(leds)):
                 leds[led_index]["state"] = payload
                 set_led(led_index)
-                publish_led(led_index)
+                # publish_led(led_index)
                 publish_all_led({"state": payload })
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
         elif msg.topic in [led_config.get('command_topic') for led_config in device_config['cmps'].values()]:
             led_index = int(msg.topic.split('_')[-1]) -1
             leds[led_index]["state"] = payload
@@ -109,7 +146,7 @@ def on_message(client, userdata, msg):
         log_client.debug(f"[MQTT][%15s] Message topic : {msg.topic}", "on_message")
 
 def gen_leds_conf():
-    led_config = {}
+    # led_config = {}
     # Iterate over each component configuration in the device configuration
     # and update string values by replacing 'MQTT_UID' with its actual value.
     for _, component_values in device_config["cmps"].items():
@@ -122,23 +159,23 @@ def gen_leds_conf():
     # For each LED, it creates a unique identifier and sets its configuration,
     # including topics for state and command, which will be used with the MQTT broker,
     # then updates the device configuration with this information.
-    for i in range(1, NUM_LEDS + 1):
-        led_id = f"led_{i}"
-        led_number = f"{i:02}"  # Format as two digits
-        led_config[led_id] = {
-            "p": "light",
-            "clrm": "rgb",
-            "ret": True,
-            "unique_id": f"ws2811_led_{led_number}",
-            "rgb_stat_t": f"stat/{MQTT_UID}/led_{led_number}/rgb",
-            "rgb_cmd_t": f"cmnd/{MQTT_UID}/led_{led_number}/rgb",
-            "name": f"Led {led_number}",
-            "command_topic": f"cmnd/{MQTT_UID}/led_{led_number}",
-            "state_topic": f"stat/{MQTT_UID}/led_{led_number}"
-        }
+    # for i in range(1, NUM_LEDS + 1):
+    #     led_id = f"led_{i}"
+    #     led_number = f"{i:02}"  # Format as two digits
+    #     led_config[led_id] = {
+    #         "p": "light",
+    #         "clrm": "rgb",
+    #         "ret": True,
+    #         "unique_id": f"ws2811_led_{led_number}",
+    #         "rgb_stat_t": f"stat/{MQTT_UID}/led_{led_number}/rgb",
+    #         "rgb_cmd_t": f"cmnd/{MQTT_UID}/led_{led_number}/rgb",
+    #         "name": f"Led {led_number}",
+    #         "command_topic": f"cmnd/{MQTT_UID}/led_{led_number}",
+    #         "state_topic": f"stat/{MQTT_UID}/led_{led_number}"
+    #     }
 
-    device_config["cmps"].update(led_config)
-    log_client.info("[MQTT][%15s] `LED configuration generated` :", "gen_leds_conf")
+    # device_config["cmps"].update(led_config)
+    # log_client.info("[MQTT][%15s] `LED configuration generated` :", "gen_leds_conf")
     if log_client.getEffectiveLevel() == logging.INFO:
         pprint.pprint(device_config, indent=2)
 
@@ -157,5 +194,5 @@ def init_mqtt():
     mqtt_client.on_message = on_message
     mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
     mqtt_client.loop_start()
-    for i in range(NUM_LEDS):
-        publish_led(i)
+    # for i in range(NUM_LEDS):
+    #     publish_led(i)
