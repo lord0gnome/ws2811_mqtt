@@ -14,10 +14,10 @@ mqtt_client = None
 device_config = None  # Declare a global variable for the device configuration
 
 # MQTT settings
-MQTT_BROKER = os.getenv("MQTT_BROKER") or raise ValueError("Missing MQTT_BROKEN env var")
-MQTT_PORT = int(os.getenv("MQTT_PORT")) or raise ValueError("Missing MQTT_BROKEN env var"
-MQTT_USER = os.getenv("MQTT_USER") or raise ValueError("Missing MQTT_BROKEN env var"
-MQTT_PASS = os.getenv("MQTT_PASS") or raise ValueError("Missing MQTT_BROKEN env var"
+MQTT_BROKER = os.getenv("MQTT_BROKER") or raise ValueError("Missing MQTT_BROKER env var")
+MQTT_PORT = int(os.getenv("MQTT_PORT")) or raise ValueError("Missing MQTT_PORT env var"
+MQTT_USER = os.getenv("MQTT_USER") or raise ValueError("Missing MQTT_USER env var"
+MQTT_PASS = os.getenv("MQTT_PASS") or raise ValueError("Missing MQTT_PASS env var"
 MQTT_UID = os.getenv("MQTT_UID") or "ws2811-mqtt"
 MQTT_TOPIC_STATUS = os.getenv("MQTT_TOPIC_STATUS") or f"homeassistant/device/{MQTT_UID}/config"
 
