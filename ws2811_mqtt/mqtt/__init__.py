@@ -4,6 +4,7 @@ import paho.mqtt.client as mqtt
 import yaml
 import pprint
 import logging
+from pathlib import Path
 
 from ws2811_mqtt.logger import log_client
 from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_alternating_colors, stop_alternating_colors, set_ac_option
@@ -184,7 +185,8 @@ def init_mqtt():
     global mqtt_client, device_config  # Declare global to modify the external variables
 
     # Load device configuration once during initialization
-    with open('ws2811_mqtt/device_config.yaml', 'r') as file:
+    path = Path(__file__) / "../../device_config.yaml"
+    with open(path, 'r') as file:
         device_config = yaml.safe_load(file)
         # Replace placeholder MQTT_UID, and generate as many "Lights" as there are leds in HA
         gen_leds_conf()
