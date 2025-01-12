@@ -1,4 +1,5 @@
 .env
+.token
 dist
 poetry.lock
 __pycache__
