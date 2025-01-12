@@ -7,3 +7,6 @@
 - Improved mqtt control of alternating patterns for LED animations.
 - Better management of main loop when handing changes in configuration
 - Better management of persistent states when restarting the program.
+
+# 1.1.1
+- Fix path of `device_config.yaml` which was not working
