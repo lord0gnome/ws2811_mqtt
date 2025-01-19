@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from ws2811_mqtt.logger import log_client
-from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_alternating_colors, stop_alternating_colors, set_ac_option
+from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_cycle_colors, stop_cycle_colors, start_alternate_colors, stop_alternate_colors, set_cc_option, pixels
 from ws2811_mqtt.utils import colr_str_to_tuple, colr_tuple_to_st
 
 
@@ -52,7 +52,6 @@ def publish_all_led(all_led_state):
     except Exception as e:
         log_client.error(f"[MQTT][%15s] Error publishing LED status: {e}", "publish_all_led")
 
-
 def publish_led(led_index):
     try:
         led = leds[led_index]
@@ -88,49 +87,69 @@ def on_message(client, userdata, msg):
         payload = msg.payload.decode('utf-8')
         log_client.info(f"[MQTT][%15s] topic  : \"{msg.topic}\"", "on_message")
         log_client.info(f"[MQTT][%15s] payload: \"{msg.payload}\"", "on_message")
-        if msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate":
+        if msg.topic == f"cmnd/{MQTT_UID}/all_leds/cycle_color":
             if payload == "ON":
                 mqtt_client.publish(f"stat/{MQTT_UID}/all_leds", "OFF".encode('utf-8'), retain=True)
-                start_alternating_colors()
+                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
+                stop_alternate_colors()
+                start_cycle_colors()
             else:
-                stop_alternating_colors()
+                stop_cycle_colors()
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", payload, retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate":
+            if payload == "ON":
+                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
+                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds", "OFF".encode('utf-8'), retain=True)
+                stop_cycle_colors()
+                start_alternate_colors()
+            else:
+                stop_alternate_colors()
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", payload, retain=True)
-        
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_one/rgb":
             color_one = colr_str_to_tuple(payload)
-            set_ac_option("color_one", color_one)
+            set_cc_option("color_one", color_one)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_one/rgb", payload.encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/auto_write":
+            pixels.auto_write = False if payload == "ON" else True
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/auto_write", payload.encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_one":
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_one", "ON".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_two/rgb":
             color_two = colr_str_to_tuple(payload)
-            set_ac_option("color_two", color_two)
+            set_cc_option("color_two", color_two)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_two/rgb", payload.encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_two":
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_two", "ON".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/rate":
             rate = payload
-            set_ac_option("rate", float(rate))
+            set_cc_option("rate", float(rate))
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/rate", payload, retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/transition":
             transition = True if payload == "ON" else False
-            set_ac_option("transition", transition)
+            set_cc_option("transition", transition)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/transition", payload, retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/rgb":
-            stop_alternating_colors()
+            stop_cycle_colors()
+            stop_alternate_colors()
             for led_index in range(len(leds)):
                 leds[led_index] = {"state": "ON", "color": colr_str_to_tuple(payload) }
                 set_led(led_index)
                 # publish_led(led_index)
                 publish_all_led({"state": "ON", "color": colr_str_to_tuple(payload) })
+            if not pixels.auto_write:
+                pixels.show()
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds":
-            stop_alternating_colors()
+            stop_cycle_colors()
+            stop_alternate_colors()
             for led_index in range(len(leds)):
                 leds[led_index]["state"] = payload
                 set_led(led_index)
                 # publish_led(led_index)
                 publish_all_led({"state": payload })
+            if not pixels.auto_write:
+                pixels.show()
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
         elif msg.topic in [led_config.get('command_topic') for led_config in device_config['cmps'].values()]:
             led_index = int(msg.topic.split('_')[-1]) -1
@@ -185,7 +204,7 @@ def init_mqtt():
     global mqtt_client, device_config  # Declare global to modify the external variables
 
     # Load device configuration once during initialization
-    path = Path(__file__) / "../../device_config.yaml"
+    path = Path(os.path.dirname(__file__)) / "../device_config.yaml"
     with open(path, 'r') as file:
         device_config = yaml.safe_load(file)
         # Replace placeholder MQTT_UID, and generate as many "Lights" as there are leds in HA

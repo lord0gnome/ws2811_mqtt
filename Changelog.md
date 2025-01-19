@@ -10,3 +10,8 @@
 
 # 1.1.1
 - Fix path of `device_config.yaml` which was not working
+
+# 1.2.0
+- Added support for new color transition effects.
+- Added control over the auto_write adafruit pixels library variable
+- Changed the step range and precision

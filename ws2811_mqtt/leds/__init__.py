@@ -10,66 +10,110 @@ from ws2811_mqtt.logger import log_client
 NUM_LEDS = int(os.getenv("NUM_LEDS") or 50) # Number
 
 # Initialize the NeoPixel strip
-pixels = neopixel.NeoPixel(board.D18, NUM_LEDS, brightness=1, auto_write=True)
+pixels = neopixel.NeoPixel(board.D18, NUM_LEDS, brightness=1, auto_write=os.getenv("AUTOWRITE") == "True" or False)
 leds = [{"state": "OFF", "color": (255,255,255)} for _ in range(len(pixels))]
 # pixels = [(0, 0, 0) for _ in range(NUM_LEDS)]
 
-alternating_thread = None
-alternating_colors_active = False
+loop_thread = None
+cycle_colors_active = False
+alternate_colors_active = False
 last_state = -1
 
-alternating_colors_options = {
+colors_options = {
     "color_one": (255,255,0),
     "color_two": (0,255,255),
     "rate": 2,
     "transition": True,
 }
 
-def set_ac_option(key, value):
-    global alternating_colors_options
-    global alternating_colors_active
+def set_cc_option(key, value):
+    global colors_options
+    global cycle_colors_active
 
-    log_client.info(f"[LEDS][%15s] set_ac_option called with key={key}, value={value}", "set_ac_option")
-    alternating_colors_options[key] = value
-    if alternating_colors_active:
-        stop_alternating_colors()
-        start_alternating_colors()
+    log_client.info(f"[LEDS][%15s] set_cc_option called with key={key}, value={value}", "set_cc_option")
+    colors_options[key] = value
+    if cycle_colors_active:
+        stop_cycle_colors()
+        start_cycle_colors()
 
 
-def manage_alternating_colors():
-    global alternating_colors_active
-    global alternating_colors_options
+def manage_alternate_colors():
+    global alternate_colors_active
+    global colors_options
     global last_state
     try:
         state = -last_state
-        while alternating_colors_active:
+        while alternate_colors_active:
             state = -state
             for i in range(NUM_LEDS):
-                set_l_on(i, alternating_colors_options.get("color_one") if state == 1 else alternating_colors_options.get("color_two"))
-                if alternating_colors_options.get("transition"):
-                    time.sleep(alternating_colors_options.get("rate") / NUM_LEDS)
-                if not alternating_colors_active:
+                state = -state
+                set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
+                if colors_options.get("transition"):
+                    time.sleep(colors_options.get("rate") / NUM_LEDS)
+                if not alternate_colors_active:
                     break
-            log_client.info(f"[LEDS][%15s] state => {state}", "manage_alternating_colors")
-            if not alternating_colors_options.get("transition"):
-                time.sleep(alternating_colors_options.get("rate"))
+            if not pixels.auto_write:
+                pixels.show()
+            log_client.info(f"[LEDS][%15s] state => {state}", "manage_alternate_colors")
+            if not colors_options.get("transition"):
+                time.sleep(colors_options.get("rate"))
     except Exception as e:
-        log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_alternating_colors")
+        log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_alternate_colors")
 
-def start_alternating_colors():
-    global alternating_thread, alternating_colors_active, alternating_colors_options
-    if alternating_thread is not None and alternating_thread.is_alive():
-        stop_alternating_colors()
-        alternating_thread.join()  # Ensure the previous thread ends before starting a new one
-    alternating_colors_active = True
-    alternating_thread = threading.Thread(target=manage_alternating_colors, args=())
-    alternating_thread.start()
+def start_alternate_colors():
+    global loop_thread, alternate_colors_active, colors_options
+    if loop_thread is not None and loop_thread.is_alive():
+        stop_alternate_colors()
+        loop_thread.join()  # Ensure the previous thread ends before starting a new one
+    alternate_colors_active = True
+    loop_thread = threading.Thread(target=manage_alternate_colors, args=())
+    loop_thread.start()
 
-def stop_alternating_colors():
-    global alternating_colors_active
-    alternating_colors_active = False
-    if alternating_thread is not None:
-        alternating_thread.join()
+def stop_alternate_colors():
+    global alternate_colors_active
+    alternate_colors_active = False
+    if loop_thread is not None:
+        loop_thread.join()
+
+def start_cycle_colors():
+    global loop_thread, cycle_colors_active, colors_options
+    if loop_thread is not None and loop_thread.is_alive():
+        stop_cycle_colors()
+        loop_thread.join()  # Ensure the previous thread ends before starting a new one
+    cycle_colors_active = True
+    loop_thread = threading.Thread(target=manage_cycle_colors, args=())
+    loop_thread.start()
+
+def stop_cycle_colors():
+    global cycle_colors_active
+    cycle_colors_active = False
+    if loop_thread is not None:
+        loop_thread.join()
+
+
+def manage_cycle_colors():
+    global cycle_colors_active
+    global colors_options
+    global last_state
+    try:
+        state = -last_state
+        while cycle_colors_active:
+            state = -state
+            for i in range(NUM_LEDS):
+                set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
+                if colors_options.get("transition"):
+                    time.sleep(colors_options.get("rate") / NUM_LEDS)
+                    if not pixels.auto_write:
+                        pixels.show()
+                if not cycle_colors_active:
+                    break
+            log_client.info(f"[LEDS][%15s] state => {state}", "manage_cycle_colors")
+            if not colors_options.get("transition"):
+                if not pixels.auto_write:
+                    pixels.show()
+                time.sleep(colors_options.get("rate"))
+    except Exception as e:
+        log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_cycle_colors")
 
 # Function to apply changes from the leds array to the pixels array
 def set_led(led_index):

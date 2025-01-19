@@ -29,6 +29,13 @@ cmps:
     name: "Alternate Colors"
     state_topic: "stat/MQTT_UID/all_leds/alternate"
     command_topic: "cmnd/MQTT_UID/all_leds/alternate"
+  cycle_color:
+    p: switch
+    ret: true
+    unique_id: ws2811_all_leds_cycle_color
+    name: "Cycle Colors"
+    state_topic: "stat/MQTT_UID/all_leds/cycle_color"
+    command_topic: "cmnd/MQTT_UID/all_leds/cycle_color"
   alternate_color_color_one:
     p: light
     clrm: "rgb"
@@ -52,14 +59,23 @@ cmps:
   alternate_color_rate:
     p: number
     mode: slider
-    min: 0.1
-    max: 16
+    min: 0.5
+    max: 32
+    step: 0.5
     icon: mdi:speed
     ret: true
     unique_id: ws2811_all_leds_alternate_rate
     name: "Alternating rate"
     command_topic: "cmnd/MQTT_UID/all_leds/alternate/rate"
     state_topic: "stat/MQTT_UID/all_leds/alternate/rate"
+    unit_of_measurement: "s"
+  auto_write:
+    p: switch
+    ret: true
+    unique_id: ws2811_all_leds_auto_write
+    name: "Write color to led instantly"
+    state_topic: "stat/MQTT_UID/all_leds/auto_write"
+    command_topic: "cmnd/MQTT_UID/all_leds/auto_write"
   alternate_color_transition:
     p: switch
     ret: true
