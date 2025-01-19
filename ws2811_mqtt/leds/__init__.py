@@ -49,6 +49,8 @@ def manage_alternate_colors():
                 state = -state
                 set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
                 if colors_options.get("transition"):
+                    if not pixels.auto_write:
+                        pixels.show()
                     time.sleep(colors_options.get("rate") / NUM_LEDS)
                 if not alternate_colors_active:
                     break
