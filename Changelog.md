@@ -16,6 +16,5 @@
 - Added control over the auto_write adafruit pixels library variable
 - Changed the step range and precision
 
-# 1.3.0 (Planned)
-- Add extra colors to loops
-- refactor to be simpler in regard to mqtt topics and loops
+# 1.3.0
+- Fixed Loop logic

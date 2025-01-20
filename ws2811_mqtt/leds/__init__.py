@@ -15,8 +15,7 @@ leds = [{"state": "OFF", "color": (255,255,255)} for _ in range(len(pixels))]
 # pixels = [(0, 0, 0) for _ in range(NUM_LEDS)]
 
 loop_thread = None
-cycle_colors_active = False
-alternate_colors_active = False
+loop_active = False
 last_state = -1
 
 colors_options = {
@@ -24,98 +23,81 @@ colors_options = {
     "color_two": (0,255,255),
     "rate": 2,
     "transition": True,
+    "loop_type": "alternate"
 }
 
-def set_cc_option(key, value):
+def set_cc_options(opt_object):
     global colors_options
-    global cycle_colors_active
+    global loop_active
 
-    log_client.info(f"[LEDS][%15s] set_cc_option called with key={key}, value={value}", "set_cc_option")
-    colors_options[key] = value
-    if cycle_colors_active:
-        stop_cycle_colors()
-        start_cycle_colors()
+    if loop_active:
+        stop_loop()
+    log_client.info(f"[LEDS][%15s] set_cc_options called with obj={opt_object}", "set_cc_options")
+    if opt_object:
+        colors_options = {**colors_options, **opt_object}
+        start_loop()
 
 
-def manage_alternate_colors():
-    global alternate_colors_active
+def manage_loop():
+    global loop_active
     global colors_options
     global last_state
     try:
         state = -last_state
-        while alternate_colors_active:
-            state = -state
-            for i in range(NUM_LEDS):
+        log_client.info(f"[LEDS][%15s] State: {loop_active}", "manage_loop")
+        while loop_active:
+            if colors_options.get("loop_type") == "alternate":
                 state = -state
-                set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
-                if colors_options.get("transition"):
-                    if not pixels.auto_write:
-                        pixels.show()
-                    time.sleep(colors_options.get("rate") / NUM_LEDS)
-                if not alternate_colors_active:
-                    break
-            if not pixels.auto_write:
-                pixels.show()
-            log_client.info(f"[LEDS][%15s] state => {state}", "manage_alternate_colors")
-            if not colors_options.get("transition"):
-                time.sleep(colors_options.get("rate"))
-    except Exception as e:
-        log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_alternate_colors")
-
-def start_alternate_colors():
-    global loop_thread, alternate_colors_active, colors_options
-    if loop_thread is not None and loop_thread.is_alive():
-        stop_alternate_colors()
-        loop_thread.join()  # Ensure the previous thread ends before starting a new one
-    alternate_colors_active = True
-    loop_thread = threading.Thread(target=manage_alternate_colors, args=())
-    loop_thread.start()
-
-def stop_alternate_colors():
-    global alternate_colors_active
-    alternate_colors_active = False
-    if loop_thread is not None:
-        loop_thread.join()
-
-def start_cycle_colors():
-    global loop_thread, cycle_colors_active, colors_options
-    if loop_thread is not None and loop_thread.is_alive():
-        stop_cycle_colors()
-        loop_thread.join()  # Ensure the previous thread ends before starting a new one
-    cycle_colors_active = True
-    loop_thread = threading.Thread(target=manage_cycle_colors, args=())
-    loop_thread.start()
-
-def stop_cycle_colors():
-    global cycle_colors_active
-    cycle_colors_active = False
-    if loop_thread is not None:
-        loop_thread.join()
-
-
-def manage_cycle_colors():
-    global cycle_colors_active
-    global colors_options
-    global last_state
-    try:
-        state = -last_state
-        while cycle_colors_active:
-            state = -state
-            for i in range(NUM_LEDS):
-                set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
-                if colors_options.get("transition"):
-                    time.sleep(colors_options.get("rate") / NUM_LEDS)
-                    if not pixels.auto_write:
-                        pixels.show()
-                if not cycle_colors_active:
-                    break
-            log_client.info(f"[LEDS][%15s] state => {state}", "manage_cycle_colors")
-            if not colors_options.get("transition"):
+                for i in range(NUM_LEDS):
+                    state = -state
+                    set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
+                    if colors_options.get("transition"):
+                        if not pixels.auto_write:
+                            pixels.show()
+                        time.sleep(colors_options.get("rate") / NUM_LEDS)
+                    if not loop_active:
+                        break
                 if not pixels.auto_write:
                     pixels.show()
-                time.sleep(colors_options.get("rate"))
+                log_client.info(f"[LEDS][%15s] state => {state}", "manage_loop")
+                if not colors_options.get("transition"):
+                    time.sleep(colors_options.get("rate"))
+            elif colors_options.get("loop_type") == "cycle":
+                state = -state
+                for i in range(NUM_LEDS):
+                    set_l_on(i, colors_options.get("color_one") if state == 1 else colors_options.get("color_two"))
+                    if colors_options.get("transition"):
+                        time.sleep(colors_options.get("rate") / NUM_LEDS)
+                        if not pixels.auto_write:
+                            pixels.show()
+                    if not loop_active:
+                        break
+                log_client.info(f"[LEDS][%15s] state => {state}", "manage_loop")
+                if not colors_options.get("transition"):
+                    if not pixels.auto_write:
+                        pixels.show()
+                    time.sleep(colors_options.get("rate"))
+            else:
+                break
     except Exception as e:
-        log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_cycle_colors")
+        log_client.error(f"[LEDS][%15s] Error in alternating colors: {e}", "manage_loop")
+
+def start_loop():
+    global loop_thread, loop_active, colors_options
+    if loop_thread is not None and loop_thread.is_alive():
+        stop_loop()
+        loop_thread.join()  # Ensure the previous thread ends before starting a new one
+    loop_active = True
+    loop_thread = threading.Thread(target=manage_loop, args=())
+    loop_thread.start()
+
+def stop_loop():
+    global loop_active
+    loop_active = False
+    log_client.info(f"[LEDS][%15s] Before joining the thread", "stop_loop")
+    if loop_thread is not None:
+        loop_thread.join()
+    log_client.info(f"[LEDS][%15s] After joining thread", "stop_loop")
 
 # Function to apply changes from the leds array to the pixels array
 def set_led(led_index):

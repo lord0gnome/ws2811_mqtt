@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from ws2811_mqtt.logger import log_client
-from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_cycle_colors, stop_cycle_colors, start_alternate_colors, stop_alternate_colors, set_cc_option, pixels
+from ws2811_mqtt.leds import leds, set_led, NUM_LEDS, start_loop, stop_loop, set_cc_options, pixels, loop_active
 from ws2811_mqtt.utils import colr_str_to_tuple, colr_tuple_to_st
 
 
@@ -83,83 +83,74 @@ def on_connect(client, userdata, flags, rc):
 
 
 def on_message(client, userdata, msg):
+    global loop_active
     try:
         payload = msg.payload.decode('utf-8')
         log_client.info(f"[MQTT][%15s] topic  : \"{msg.topic}\"", "on_message")
         log_client.info(f"[MQTT][%15s] payload: \"{msg.payload}\"", "on_message")
         if msg.topic == f"cmnd/{MQTT_UID}/all_leds/cycle_color":
-            if payload == "ON":
-                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds", "OFF".encode('utf-8'), retain=True)
-                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
-                stop_alternate_colors()
-                start_cycle_colors()
+            if payload == "OFF":
+                set_cc_options(False)
             else:
-                stop_cycle_colors()
+                set_cc_options({"loop_type": "cycle"}) 
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", payload, retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", "OFF".encode('utf-8'), retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate":
-            if payload == "ON":
-                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
-                mqtt_client.publish(f"stat/{MQTT_UID}/all_leds", "OFF".encode('utf-8'), retain=True)
-                stop_cycle_colors()
-                start_alternate_colors()
+            if payload == "OFF":
+                set_cc_options(False)
             else:
-                stop_alternate_colors()
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", payload, retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_one/rgb":
+                set_cc_options({"loop_type": "alternate"})
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", payload)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", "OFF".encode('utf-8'), retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/color_one/rgb":
             color_one = colr_str_to_tuple(payload)
-            set_cc_option("color_one", color_one)
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_one/rgb", payload.encode('utf-8'), retain=True)
+            set_cc_options({"color_one": color_one})
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/color_one/rgb", payload.encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/auto_write":
             pixels.auto_write = False if payload == "ON" else True
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/auto_write", payload.encode('utf-8'), retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_one":
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_one", "ON".encode('utf-8'), retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_two/rgb":
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/color_one":
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/color_one", "ON".encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/color_two/rgb":
             color_two = colr_str_to_tuple(payload)
-            set_cc_option("color_two", color_two)
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_two/rgb", payload.encode('utf-8'), retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/color_two":
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/color_two", "ON".encode('utf-8'), retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/rate":
+            set_cc_options({"color_two": color_two})
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/color_two/rgb", payload.encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/color_two":
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/color_two", "ON".encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/rate":
             rate = payload
-            set_cc_option("rate", float(rate))
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/rate", payload, retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate/transition":
-            transition = True if payload == "ON" else False
-            set_cc_option("transition", transition)
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate/transition", payload, retain=True)
+            set_cc_options({"rate": float(rate)})
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/rate", payload)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/transition":
+            transition = False if payload == "ON" else True
+            set_cc_options({"transition": transition})
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/transition", payload)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/rgb":
-            stop_cycle_colors()
-            stop_alternate_colors()
+            stop_loop()
             for led_index in range(len(leds)):
                 leds[led_index] = {"state": "ON", "color": colr_str_to_tuple(payload) }
                 set_led(led_index)
                 # publish_led(led_index)
-                publish_all_led({"state": "ON", "color": colr_str_to_tuple(payload) })
-            if not pixels.auto_write:
-                pixels.show()
+            publish_all_led({"state": "ON", "color": colr_str_to_tuple(payload) })
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
-        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds":
-            stop_cycle_colors()
-            stop_alternate_colors()
+            if not pixels.auto_write:
+                pixels.show()
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", "ON".encode('utf-8'), retain=True)
+        elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/state":
+            stop_loop()
             for led_index in range(len(leds)):
                 leds[led_index]["state"] = payload
                 set_led(led_index)
                 # publish_led(led_index)
-                publish_all_led({"state": payload })
+            publish_all_led({"state": payload }) 
             if not pixels.auto_write:
                 pixels.show()
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", payload.encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
-        elif msg.topic in [led_config.get('command_topic') for led_config in device_config['cmps'].values()]:
-            led_index = int(msg.topic.split('_')[-1]) -1
-            leds[led_index]["state"] = payload
-            set_led(led_index)
-        elif msg.topic in [led_config.get('rgb_cmd_t') for led_config in device_config['cmps'].values()]:
-            led_index = int(msg.topic.split(MQTT_UID)[-1].split('/')[1].split('_')[-1]) -1
-            leds[led_index] = {"state": "ON", "color": colr_str_to_tuple(payload) }
-            set_led(led_index)
-        # publish_led(led_index)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
     except Exception as e:
         log_client.error(f"[MQTT][%15s] Error processing message: {e}", "on_message")
         log_client.debug(f"[MQTT][%15s] Message payload : {msg.payload}", "on_message")
