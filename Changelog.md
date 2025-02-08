@@ -18,3 +18,8 @@
 
 # 1.3.0
 - Fixed Loop logic
+
+# 1.3.1
+- **Added FirePlace LED Mode**
+Adds a new mode to create a cozy ambiance with pulsing flames, perfect for simulating a fireplace.
+- Fixed lack of retain on rate

@@ -94,6 +94,16 @@ def on_message(client, userdata, msg):
             else:
                 set_cc_options({"loop_type": "cycle"}) 
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", payload, retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/fireplace", "OFF".encode('utf-8'), retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", "OFF".encode('utf-8'), retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
+        if msg.topic == f"cmnd/{MQTT_UID}/all_leds/fireplace":
+            if payload == "OFF":
+                set_cc_options(False)
+            else:
+                set_cc_options({"loop_type": "fireplace"}) 
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/fireplace", payload, retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/alternate":
@@ -102,6 +112,7 @@ def on_message(client, userdata, msg):
             else:
                 set_cc_options({"loop_type": "alternate"})
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", payload)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/fireplace", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/color_one/rgb":
@@ -122,7 +133,7 @@ def on_message(client, userdata, msg):
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/rate":
             rate = payload
             set_cc_options({"rate": float(rate)})
-            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/rate", payload)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/rate", payload, retain=True)
         elif msg.topic == f"cmnd/{MQTT_UID}/all_leds/transition":
             transition = False if payload == "ON" else True
             set_cc_options({"transition": transition})
@@ -134,6 +145,7 @@ def on_message(client, userdata, msg):
                 set_led(led_index)
                 # publish_led(led_index)
             publish_all_led({"state": "ON", "color": colr_str_to_tuple(payload) })
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/fireplace", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
             if not pixels.auto_write:
@@ -149,6 +161,7 @@ def on_message(client, userdata, msg):
             if not pixels.auto_write:
                 pixels.show()
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/state", payload.encode('utf-8'), retain=True)
+            mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/fireplace", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/alternate", "OFF".encode('utf-8'), retain=True)
             mqtt_client.publish(f"stat/{MQTT_UID}/all_leds/cycle_color", "OFF".encode('utf-8'), retain=True)
     except Exception as e:

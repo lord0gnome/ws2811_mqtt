@@ -3,6 +3,7 @@ import neopixel
 import os
 import threading  # For running the alternating color loop
 import time
+import random
 
 from ws2811_mqtt.logger import log_client
 
@@ -60,8 +61,13 @@ def manage_loop():
                 if not pixels.auto_write:
                     pixels.show()
                 log_client.info(f"[LEDS][%15s] state => {state}", "manage_loop")
-                if not colors_options.get("transition"):
-                    time.sleep(colors_options.get("rate"))
+                total_wait_time = colors_options.get("rate")
+                elapsed_time = 0
+                while elapsed_time < total_wait_time:
+                    if not loop_active:
+                        break
+                    time.sleep(0.5)  # Check every second
+                    elapsed_time += 0.5
             elif colors_options.get("loop_type") == "cycle":
                 state = -state
                 for i in range(NUM_LEDS):
@@ -76,7 +82,49 @@ def manage_loop():
                 if not colors_options.get("transition"):
                     if not pixels.auto_write:
                         pixels.show()
-                    time.sleep(colors_options.get("rate"))
+                total_wait_time = colors_options.get("rate")
+                elapsed_time = 0
+                while elapsed_time < total_wait_time:
+                    if not loop_active:
+                        break
+                    time.sleep(0.5)  # Check every second
+                    elapsed_time += 0.5
+            elif colors_options.get("loop_type") == "fireplace":
+                steps_per_second = 5  # Number of steps between colors per second
+                total_steps = int(colors_options.get("rate") * steps_per_second)
+                step_duration = 1.0 / steps_per_second
+                for current_step in range(total_steps):
+                    for i in range(NUM_LEDS):
+                        # Generate random reddish-yellowish colors
+                        red = random.randint(150, 255)
+                        green = random.randint(50, 100)
+                        blue = random.randint(0, 50)
+                        brightness = random.uniform(0.5, 1.0)
+
+                        # Apply brightness factor
+                        target_red = int(red * brightness)
+                        target_green = int(green * brightness)
+                        target_blue = int(blue * brightness)
+
+                        # Get current color
+                        current_color = leds[i]["color"]
+                        cur_red, cur_green, cur_blue = current_color
+
+                        # Transition between current and target color
+                        intermediate_red = int(cur_red + (target_red - cur_red) * (current_step / total_steps))
+                        intermediate_green = int(cur_green + (target_green - cur_green) * (current_step / total_steps))
+                        intermediate_blue = int(cur_blue + (target_blue - cur_blue) * (current_step / total_steps))
+
+                        # Apply the new intermediate color
+                        set_l_on(i, (intermediate_red, intermediate_green, intermediate_blue))
+                    if not pixels.auto_write:
+                        pixels.show()
+                    # Wait for the next step
+                    time.sleep(step_duration)
+
+                # Ensure LEDs show the final color after the loop
+                if not pixels.auto_write:
+                    pixels.show()
             else:
                 break
     except Exception as e:

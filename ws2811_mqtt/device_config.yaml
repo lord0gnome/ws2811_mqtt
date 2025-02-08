@@ -27,6 +27,12 @@ cmps:
     name: "Alternate Colors"
     state_topic: "stat/MQTT_UID/all_leds/alternate"
     command_topic: "cmnd/MQTT_UID/all_leds/alternate"
+  fireplace:
+    p: switch
+    unique_id: ws2811_all_leds_fireplace
+    name: "Fireplace Colors"
+    state_topic: "stat/MQTT_UID/all_leds/fireplace"
+    command_topic: "cmnd/MQTT_UID/all_leds/fireplace"
   cycle_color:
     p: switch
     unique_id: ws2811_all_leds_cycle_color
