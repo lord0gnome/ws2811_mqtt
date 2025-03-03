@@ -90,25 +90,32 @@ def manage_loop():
                     time.sleep(0.5)  # Check every second
                     elapsed_time += 0.5
             elif colors_options.get("loop_type") == "fireplace":
-                steps_per_second = 5  # Number of steps between colors per second
+                steps_per_second = 15  # Number of steps between colors per second
                 total_steps = int(colors_options.get("rate") * steps_per_second)
                 step_duration = 1.0 / steps_per_second
+                final_colors = []  # Store final colors for each LED
+                for i in range(NUM_LEDS):
+                    # Generate random reddish-yellowish colors for final step
+                    red = random.randint(150, 255)
+                    green = random.randint(50, 100)
+                    blue = random.randint(0, 50)
+                    brightness = random.uniform(0.5, 1.0)
+
+                    # Apply brightness factor
+                    target_green = int(green * brightness)
+                    target_red = int(red * brightness)
+                    target_blue = int(blue * brightness)
+                    final_colors.append((target_green, target_red, target_blue))
+
+
                 for current_step in range(total_steps):
                     for i in range(NUM_LEDS):
-                        # Generate random reddish-yellowish colors
-                        red = random.randint(150, 255)
-                        green = random.randint(50, 100)
-                        blue = random.randint(0, 50)
-                        brightness = random.uniform(0.5, 1.0)
-
-                        # Apply brightness factor
-                        target_red = int(red * brightness)
-                        target_green = int(green * brightness)
-                        target_blue = int(blue * brightness)
-
-                        # Get current color
+                        # Get the current color
                         current_color = leds[i]["color"]
-                        cur_red, cur_green, cur_blue = current_color
+                        cur_green, cur_red, cur_blue = current_color
+
+                        # Determine target color for final step
+                        target_green, target_red, target_blue = final_colors[i]
 
                         # Transition between current and target color
                         intermediate_red = int(cur_red + (target_red - cur_red) * (current_step / total_steps))
@@ -116,15 +123,22 @@ def manage_loop():
                         intermediate_blue = int(cur_blue + (target_blue - cur_blue) * (current_step / total_steps))
 
                         # Apply the new intermediate color
-                        set_l_on(i, (intermediate_red, intermediate_green, intermediate_blue))
+                        set_l_on(i, (intermediate_green, intermediate_red, intermediate_blue))
                     if not pixels.auto_write:
                         pixels.show()
                     # Wait for the next step
                     time.sleep(step_duration)
 
-                # Ensure LEDs show the final color after the loop
+                # Ensure LEDs show the final color for a full cycle before restarting
+                for i in range(NUM_LEDS):
+                    set_l_on(i, final_colors[i])
                 if not pixels.auto_write:
                     pixels.show()
+                total_wait_time = colors_options.get("rate")
+                elapsed_time = 0
+                while elapsed_time < total_wait_time:
+                    time.sleep(0.5)  # Hold final color for the remaining time of the cycle
+                    elapsed_time += 0.5
             else:
                 break
     except Exception as e:
