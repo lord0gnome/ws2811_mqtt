@@ -106,6 +106,8 @@ def manage_loop():
                     target_red = int(red * brightness)
                     target_blue = int(blue * brightness)
                     final_colors.append((target_green, target_red, target_blue))
+                    if not loop_active:
+                        break
 
 
                 for current_step in range(total_steps):
@@ -124,6 +126,8 @@ def manage_loop():
 
                         # Apply the new intermediate color
                         set_l_on(i, (intermediate_green, intermediate_red, intermediate_blue))
+                        if not loop_active:
+                            break
                     if not pixels.auto_write:
                         pixels.show()
                     # Wait for the next step
